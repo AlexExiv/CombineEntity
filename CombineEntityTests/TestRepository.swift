@@ -22,8 +22,6 @@ protocol TestEntityBackProtocol: REBackEntityProtocol
 
 extension TestEntityBackProtocol
 {
-    var _key: REEntityKey { return REEntityKey( id ) }
-    
     init( entity: any REBackEntityProtocol )
     {
         self.init( entity: entity as! any TestEntityBackProtocol )
@@ -64,8 +62,6 @@ protocol IndirectEntityBackProtocol: REBackEntityProtocol
 
 extension IndirectEntityBackProtocol
 {
-    var _key: REEntityKey { return REEntityKey( id ) }
-    
     init( entity: any REBackEntityProtocol )
     {
         self.init( entity: entity as! any TestEntityBackProtocol )
@@ -97,12 +93,12 @@ final class TestRepository<Entity: REBackEntityProtocol>: REEntityRepository<Ent
     func Add( entities: [Entity] )
     {
         items.append( contentsOf: entities )
-        rxEntitiesUpdated.send( entities.map { REEntityUpdated( key: $0._key, operation: .insert ) } )
+        rxEntitiesUpdated.send( entities.map { REEntityUpdated( key: $0.reKey, operation: .insert ) } )
     }
     
     func Update( entity: Entity )
     {
-        if let i = items.firstIndex( where: { entity._key == $0._key } )
+        if let i = items.firstIndex( where: { entity.id == $0.id } )
         {
             items[i] = entity
         }
@@ -110,12 +106,12 @@ final class TestRepository<Entity: REBackEntityProtocol>: REEntityRepository<Ent
         {
             items.append( entity )
         }
-        rxEntitiesUpdated.send( [REEntityUpdated( key: entity._key, operation: .update )] )
+        rxEntitiesUpdated.send( [REEntityUpdated( key: entity.reKey, operation: .update )] )
     }
     
     func Delete( key: REEntityKey )
     {
-        items.removeAll( where: { $0._key == key } )
+        items.removeAll( where: { $0.reKey == key } )
         rxEntitiesUpdated.send( [REEntityUpdated( key: key, operation: .delete )] )
     }
     
@@ -127,12 +123,12 @@ final class TestRepository<Entity: REBackEntityProtocol>: REEntityRepository<Ent
     
     override func RxGet( key: REEntityKey ) -> RESingle<Entity?>
     {
-        return REJust( items.first(where: { $0._key == key } ) )
+        return REJust( items.first(where: { $0.reKey == key } ) )
     }
     
     override func RxGet( keys: [REEntityKey] ) -> RESingle<[Entity]>
     {
-        return REJust( items.filter { keys.contains( $0._key ) } )
+        return REJust( items.filter { keys.contains( $0.reKey ) } )
     }
 }
 
@@ -152,19 +148,19 @@ final class TestRepositoryDirect: REEntityRepository<TestEntityBack>
     func Add( entities: [TestEntityBack] )
     {
         items.append( contentsOf: entities )
-        rxEntitiesUpdated.send( entities.map { REEntityUpdated( key: $0._key, operation: .insert ) } )
+        rxEntitiesUpdated.send( entities.map { REEntityUpdated( key: $0.reKey, operation: .insert ) } )
     }
     
     override func RxGet( key: REEntityKey ) -> RESingle<TestEntityBack?>
     {
-        return REJust( items.first(where: { $0._key == key } ) )
+        return REJust( items.first(where: { $0.reKey == key } ) )
             .flatMap { $0 == nil ? REJust( nil ) : self.RxLoad( entities: [$0!] ).map { $0.first }.eraseToAnyPublisher() }
             .eraseToAnyPublisher()
     }
     
     override func RxGet( keys: [REEntityKey] ) -> RESingle<[TestEntityBack]>
     {
-        return REJust( items.filter { keys.contains( $0._key ) } )
+        return REJust( items.filter { keys.contains( $0.reKey ) } )
             .flatMap { self.RxLoad( entities: $0 ) }
             .eraseToAnyPublisher()
     }
@@ -185,7 +181,7 @@ extension Array where Element: REBackEntityProtocol
     public func asEntitiesMap() -> [REEntityKey: Element]
     {
         var map = [REEntityKey: Element]()
-        forEach { map[$0._key] = $0 }
+        forEach { map[$0.reKey] = $0 }
         return map
     }
 }

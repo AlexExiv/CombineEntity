@@ -15,48 +15,48 @@ import Combine
 ///- `Extra`: Any extra type which passes to the `fetch` closure for using during the data fetching
 public class REKeyArrayObservableExtra<Entity: REEntity, Extra>: REArrayObservableExtra<Entity, Extra>
 {
-    public var keys: [REEntityKey]
+    public var keys: [Entity.ID]
     {
         set
         {
             lock.lock()
             defer { lock.unlock() }
             
-            _keys = newValue
+            innerKeys = newValue
         }
-        get { _keys }
+        get { innerKeys }
         
     }
-    var _keys: [REEntityKey] = []
+    var innerKeys: [Entity.ID] = []
 
-    init( holder: REEntityCollection<Entity>, keys: [REEntityKey] = [], extra: Extra? = nil, observeOn: DispatchQueue )
+    init( holder: REEntityCollection<Entity>, keys: [Entity.ID] = [], extra: Extra? = nil, observeOn: DispatchQueue )
     {
-        self._keys = keys
+        self.innerKeys = keys
         super.init( holder: holder, extra: extra, observeOn: observeOn )
     }
     
-    override func Update( entities: [REEntityKey: Entity], operation: REUpdateOperation )
+    override func Update( entities: [Entity.ID: Entity], operation: REUpdateOperation )
     {
         lock.lock()
         defer { lock.unlock() }
         
         let _entities = self.entities
         _entities.forEach {
-            if let e = entities[$0._key]
+            if let e = entities[$0.id]
             {
                 Apply( entity: e, operation: operation )
             }
         }
     }
     
-    override func Update( entities: [REEntityKey: Entity], operations: [REEntityKey: REUpdateOperation] )
+    override func Update( entities: [Entity.ID: Entity], operations: [Entity.ID: REUpdateOperation] )
     {
         lock.lock()
         defer { lock.unlock() }
         
         let _entities = self.entities
         _entities.forEach {
-            if let e = entities[$0._key], let o = operations[$0._key]
+            if let e = entities[$0.id], let o = operations[$0.id]
             {
                 Apply( entity: e, operation: o )
             }
@@ -71,7 +71,7 @@ public class REKeyArrayObservableExtra<Entity: REEntity, Extra>: REArrayObservab
             Set( entity: entity )
             
         case .delete:
-            Remove( key: entity._key )
+            Remove( key: entity.id )
             
         case .clear:
             Clear()
@@ -80,12 +80,12 @@ public class REKeyArrayObservableExtra<Entity: REEntity, Extra>: REArrayObservab
     
     /// Add new key to the sequence of keys if the key exists nothing happens
     /// - Parameter key: key for adding
-    public func Append( key: REEntityKey )
+    public func Append( key: Entity.ID )
     {
         lock.lock()
         defer { lock.unlock() }
         
-        _keys.AppendNotExist( key: key )
+        innerKeys.AppendNotExist( key: key )
     }
     
     public override func Append( entity: Entity )
@@ -94,7 +94,7 @@ public class REKeyArrayObservableExtra<Entity: REEntity, Extra>: REArrayObservab
         defer { lock.unlock() }
         
         super.Append( entity: entity )
-        _keys.AppendNotExist( key: entity._key )
+        innerKeys.AppendNotExist( key: entity.id )
     }
     
     public override func Remove( entity: Entity )
@@ -103,16 +103,16 @@ public class REKeyArrayObservableExtra<Entity: REEntity, Extra>: REArrayObservab
         defer { lock.unlock() }
         
         super.Remove( entity: entity )
-        _keys.Remove( key: entity._key )
+        innerKeys.Remove( key: entity.id )
     }
 
-    public override func Remove( key: REEntityKey )
+    public override func Remove( key: Entity.ID )
     {
         lock.lock()
         defer { lock.unlock() }
         
         super.Remove( key: key )
-        _keys.Remove( key: key )
+        innerKeys.Remove( key: key )
     }
     
     override func Clear()
@@ -133,9 +133,9 @@ extension Publisher
     }
 }
 
-extension Publisher where Output == [REEntityKey]
+extension Publisher
 {
-    public func bind<Entity: REEntity, Extra>( keys: REKeyArrayObservableExtra<Entity, Extra> ) -> AnyCancellable
+    public func bind<Entity: REEntity, Extra>( keys: REKeyArrayObservableExtra<Entity, Extra> ) -> AnyCancellable where Output == [Entity.ID]
     {
         return receive( on: keys.queue )
             .sink( receiveCompletion: { _ in }, receiveValue: { keys.keys = $0 } )

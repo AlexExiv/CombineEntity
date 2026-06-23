@@ -80,27 +80,27 @@ public class REEntityObservable<Entity: REEntity>
         
     }
     
-    func Update( source: String, entities: [REEntityKey: Entity] )
+    func Update( source: String, entities: [Entity.ID: Entity] )
     {
         
     }
     
     func Update( entity: Entity, operation: REUpdateOperation )
     {
-        Update( entities: [entity._key: entity], operation: operation )
+        Update( entities: [entity.id: entity], operation: operation )
     }
 
-    func Update( entities: [REEntityKey: Entity], operation: REUpdateOperation )
+    func Update( entities: [Entity.ID: Entity], operation: REUpdateOperation )
     {
         fatalError( "This method must be overridden" )
     }
     
-    func Update( entities: [REEntityKey: Entity], operations: [REEntityKey: REUpdateOperation] )
+    func Update( entities: [Entity.ID: Entity], operations: [Entity.ID: REUpdateOperation] )
     {
         fatalError( "This method must be overridden" )
     }
     
-    func Delete( keys: Set<REEntityKey> )
+    func Delete( keys: Set<Entity.ID> )
     {
         fatalError( "This method must be overridden" )
     }

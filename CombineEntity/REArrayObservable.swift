@@ -53,14 +53,14 @@ public class REArrayObservableExtra<Entity: REEntity, Extra>: REEntityObservable
         lock.lock()
         defer { lock.unlock() }
         
-        if let i = entities.firstIndex( where: { entity._key == $0._key } ), source != uuid
+        if let i = entities.firstIndex( where: { entity.id == $0.id } ), source != uuid
         {
             entities[i] = entity
             rxPublish.send( entities )
         }
     }
     
-    override func Update( source: String, entities: [REEntityKey: Entity] )
+    override func Update( source: String, entities: [Entity.ID: Entity] )
     {
         guard source != uuid else { return }
         
@@ -71,7 +71,7 @@ public class REArrayObservableExtra<Entity: REEntity, Extra>: REEntityObservable
         for i in 0..<self.entities.count
         {
             let e = self.entities[i]
-            if let ne = entities[e._key]
+            if let ne = entities[e.id]
             {
                 self.entities[i] = ne
                 was = true
@@ -84,7 +84,7 @@ public class REArrayObservableExtra<Entity: REEntity, Extra>: REEntityObservable
         }
     }
     
-    override func Update( entities: [REEntityKey: Entity], operation: REUpdateOperation )
+    override func Update( entities: [Entity.ID: Entity], operation: REUpdateOperation )
     {
         lock.lock()
         defer { lock.unlock() }
@@ -102,7 +102,7 @@ public class REArrayObservableExtra<Entity: REEntity, Extra>: REEntityObservable
             let _entities = self.entities
             _entities.forEach
             {
-                if let e = entities[$0._key]
+                if let e = entities[$0.id]
                 {
                     switch operation
                     {
@@ -110,7 +110,7 @@ public class REArrayObservableExtra<Entity: REEntity, Extra>: REEntityObservable
                         Set( entity: e )
                         
                     case .delete:
-                        Remove( key: e._key )
+                        Remove( key: e.id )
                         
                     default:
                         break
@@ -120,7 +120,7 @@ public class REArrayObservableExtra<Entity: REEntity, Extra>: REEntityObservable
         }
     }
     
-    override func Update( entities: [REEntityKey: Entity], operations: [REEntityKey: REUpdateOperation] )
+    override func Update( entities: [Entity.ID: Entity], operations: [Entity.ID: REUpdateOperation] )
     {
         lock.lock()
         defer { lock.unlock() }
@@ -134,7 +134,7 @@ public class REArrayObservableExtra<Entity: REEntity, Extra>: REEntityObservable
             let _entities = self.entities
             _entities.forEach
             {
-                if let e = entities[$0._key], let o = operations[$0._key]
+                if let e = entities[$0.id], let o = operations[$0.id]
                 {
                     switch o
                     {
@@ -142,7 +142,7 @@ public class REArrayObservableExtra<Entity: REEntity, Extra>: REEntityObservable
                         Set( entity: e )
                         
                     case .delete:
-                        Remove( key: e._key )
+                        Remove( key: e.id )
                         
                     default:
                         break
@@ -152,14 +152,14 @@ public class REArrayObservableExtra<Entity: REEntity, Extra>: REEntityObservable
         }
     }
     
-    override func Delete( keys: Set<REEntityKey> )
+    override func Delete( keys: Set<Entity.ID> )
     {
         let _entities = self.entities
         _entities.forEach
         {
-            if keys.contains( $0._key )
+            if keys.contains( $0.id )
             {
-                Remove( key: $0._key )
+                Remove( key: $0.id )
             }
         }
     }
@@ -175,7 +175,7 @@ public class REArrayObservableExtra<Entity: REEntity, Extra>: REEntityObservable
         lock.lock()
         defer { lock.unlock() }
         
-        if let i = entities.firstIndex( where: { $0._key == entity._key } )
+        if let i = entities.firstIndex( where: { $0.id == entity.id } )
         {
             entities[i] = entity
             rxPublish.send( entities )
@@ -261,7 +261,7 @@ public class REArrayObservableExtra<Entity: REEntity, Extra>: REEntityObservable
     
     /// Remove element from the array by its key
     /// - Parameter key: the key of the entity for removing
-    public func Remove( key: REEntityKey )
+    public func Remove( key: Entity.ID )
     {
         lock.lock()
         defer { lock.unlock() }

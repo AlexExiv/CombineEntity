@@ -17,14 +17,14 @@ public struct RESingleParams<Entity: REEntity, Extra, CollectionExtra>
     /// The first loading request flag
     public let first: Bool
     /// The key of the entity
-    public let key: REEntityKey?
+    public let key: Entity.ID?
     public let lastEntity: Entity?
     /// The observable's extra params for example filter and so on which you've passed to the `Refresh` method or its analogues of `Observable` instance
     public let extra: Extra?
     /// The collection's global extra params it maybe a region or city or so on which you've passed to the `Refresh` method or its analogues of `Collection` of observables
     public let collectionExtra: CollectionExtra?
     
-    init( refreshing: Bool = false, resetCache: Bool = false, first: Bool = false, key: REEntityKey?, lastEntity: Entity?, extra: Extra? = nil, collectionExtra: CollectionExtra? = nil )
+    init( refreshing: Bool = false, resetCache: Bool = false, first: Bool = false, key: Entity.ID?, lastEntity: Entity?, extra: Extra? = nil, collectionExtra: CollectionExtra? = nil )
     {
         self.refreshing = refreshing
         self.resetCache = resetCache
@@ -54,7 +54,7 @@ public class RESingleObservableCollectionExtra<Entity: REEntity, Extra, Collecti
     private var refreshCancellable: AnyCancellable? = nil
     private var pendingParams: RESingleParams<Entity, Extra, CollectionExtra>? = nil
     
-    public override var key: REEntityKey?
+    public override var key: Entity.ID?
     {
         set
         {
@@ -73,7 +73,7 @@ public class RESingleObservableCollectionExtra<Entity: REEntity, Extra, Collecti
         }
     }
 
-    init( holder: REEntityCollection<Entity>, key: REEntityKey? = nil, extra: Extra? = nil, collectionExtra: CollectionExtra? = nil, start: Bool = true, observeOn: DispatchQueue, fetch: @escaping SingleFetchCallback )
+    init( holder: REEntityCollection<Entity>, key: Entity.ID? = nil, extra: Extra? = nil, collectionExtra: CollectionExtra? = nil, start: Bool = true, observeOn: DispatchQueue, fetch: @escaping SingleFetchCallback )
     {
         self.collectionExtra = collectionExtra
         self.fetchCallback = fetch
@@ -89,7 +89,7 @@ public class RESingleObservableCollectionExtra<Entity: REEntity, Extra, Collecti
     
     convenience init( holder: REEntityCollection<Entity>, initial: Entity, refresh: Bool, collectionExtra: CollectionExtra? = nil, observeOn: DispatchQueue, fetch: @escaping SingleFetchCallback )
     {
-        self.init( holder: holder, key: initial._key, collectionExtra: collectionExtra, start: false, observeOn: observeOn, fetch: fetch )
+        self.init( holder: holder, key: initial.id, collectionExtra: collectionExtra, start: false, observeOn: observeOn, fetch: fetch )
         
         collection?.RxRequestForCombine( source: uuid, entity: initial )
             .receive( on: observeOn )
@@ -110,7 +110,7 @@ public class RESingleObservableCollectionExtra<Entity: REEntity, Extra, Collecti
         self.init( holder: holder, initial: initial, refresh: refresh, collectionExtra: collectionExtra, observeOn: observeOn, fetch: { fetch( $0 ).map { $0 == nil ? nil : Entity( entity: $0! ) }.eraseToAnyPublisher() } )
     }
     
-    convenience init( holder: REEntityCollection<Entity>, key: REEntityKey? = nil, extra: Extra? = nil, collectionExtra: CollectionExtra? = nil, start: Bool = true, observeOn: DispatchQueue,  fetch: @escaping SingleFetchBackCallback )
+    convenience init( holder: REEntityCollection<Entity>, key: Entity.ID? = nil, extra: Extra? = nil, collectionExtra: CollectionExtra? = nil, start: Bool = true, observeOn: DispatchQueue,  fetch: @escaping SingleFetchBackCallback )
     {
         self.init( holder: holder, key: key, extra: extra, collectionExtra: collectionExtra, start: start, observeOn: observeOn, fetch: { fetch( $0 ).map { $0 == nil ? nil : Entity( entity: $0! ) }.eraseToAnyPublisher() } )
     }

@@ -61,8 +61,8 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
             
             if let r = newValue
             {
-                singleFetchBackCallback = { $0.key == nil ? REJust( nil ) : r._RxGet( key: $0.key! ) }
-                arrayFetchBackCallback = { r._RxGet( keys: $0.keys ) }
+                singleFetchBackCallback = { $0.key == nil ? REJust( nil ) : r._RxGet( key: REEntityKey( $0.key! ) ) }
+                arrayFetchBackCallback = { r._RxGet( keys: $0.keys.map { REEntityKey( $0 ) } ) }
                 
                 if let ar = r as? REEntityAllRepositoryProtocol
                 {
@@ -141,7 +141,7 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
             {
                 k in
                 
-                self.sharedEntities.values.filter { REEntityKey( $0[keyPath: k.fieldPath!] as! AnyHashable ) == k.key }.map { $0._key }
+                self.sharedEntities.values.filter { REEntityKey( $0[keyPath: k.fieldPath!] as! AnyHashable ) == k.key }.map { $0.id }
             }
             .flatMap { $0 }
 
@@ -150,11 +150,11 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         
         if keys.count == 1
         {
-            self.Commit( key: keys[0].key, operation: keys[0].operation )
+            self.Commit( repositoryKey: keys[0].key, operation: keys[0].operation )
         }
         else if keys.count > 1
         {
-            self.Commit( keys: keys.map { $0.key }, operations: keys.map { $0.operation } )
+            self.Commit( repositoryKeys: keys.map { $0.key }, operations: keys.map { $0.operation } )
         }
         
         if indirect.count == 1
@@ -179,22 +179,22 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
     ///   - start: flag indicates start or not fetching fata immidiately after the object `init`. Default is `true`
     ///   - fetch: closure for the fetch request
     /// - Returns: single observable
-    public func CreateSingleBack( key: REEntityKey? = nil, start: Bool = true, _ fetch: @escaping SingleFetchBackCallback ) -> RESingleObservable<Entity>
+    public func CreateSingleBack( key: Entity.ID? = nil, start: Bool = true, _ fetch: @escaping SingleFetchBackCallback ) -> RESingleObservable<Entity>
     {
         return RESingleObservableCollectionExtra<Entity, REEntityExtraParamsEmpty, CollectionExtra>( holder: self, key: key, collectionExtra: collectionExtra, start: start, observeOn: queue, fetch: fetch )
     }
 
-    public func CreateSingleBackExtra<Extra>( key: REEntityKey? = nil, extra: Extra? = nil, start: Bool = true, _ fetch: @escaping SingleExtraFetchBackCallback<Extra> ) -> RESingleObservableExtra<Entity, Extra>
+    public func CreateSingleBackExtra<Extra>( key: Entity.ID? = nil, extra: Extra? = nil, start: Bool = true, _ fetch: @escaping SingleExtraFetchBackCallback<Extra> ) -> RESingleObservableExtra<Entity, Extra>
     {
         return RESingleObservableCollectionExtra<Entity, Extra, CollectionExtra>( holder: self, key: key, extra: extra, collectionExtra: collectionExtra, start: start, observeOn: queue, fetch: fetch )
     }
     
-    public func CreateSingle( key: REEntityKey? = nil, start: Bool = true, _ fetch: @escaping SingleFetchCallback ) -> RESingleObservable<Entity>
+    public func CreateSingle( key: Entity.ID? = nil, start: Bool = true, _ fetch: @escaping SingleFetchCallback ) -> RESingleObservable<Entity>
     {
         return RESingleObservableCollectionExtra<Entity, REEntityExtraParamsEmpty, CollectionExtra>( holder: self, key: key, collectionExtra: collectionExtra, start: start, observeOn: queue, fetch: fetch )
     }
 
-    public func CreateSingleExtra<Extra>( key: REEntityKey? = nil, extra: Extra? = nil, start: Bool = true, _ fetch: @escaping SingleExtraFetchCallback<Extra> ) -> RESingleObservableExtra<Entity, Extra>
+    public func CreateSingleExtra<Extra>( key: Entity.ID? = nil, extra: Extra? = nil, start: Bool = true, _ fetch: @escaping SingleExtraFetchCallback<Extra> ) -> RESingleObservableExtra<Entity, Extra>
     {
         return RESingleObservableCollectionExtra<Entity, Extra, CollectionExtra>( holder: self, key: key, extra: extra, collectionExtra: collectionExtra, start: start, observeOn: queue, fetch: fetch )
     }
@@ -213,7 +213,7 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         preconditionFailure( "To create Single with initial value you must specify singleFetchCallback or singleFetchBackCallback before" )
     }
     
-    public func CreateSingle( key: REEntityKey? = nil, start: Bool = true, refresh: Bool = false ) -> RESingleObservable<Entity>
+    public func CreateSingle( key: Entity.ID? = nil, start: Bool = true, refresh: Bool = false ) -> RESingleObservable<Entity>
     {
         let e = key == nil ? nil : sharedEntities[key!]
         if e == nil
@@ -265,22 +265,22 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
     }
     
     //MARK: - Array Keys Observables
-    public func CreateKeyArrayBack( keys: [REEntityKey] = [], _ fetch: @escaping KeyArrayFetchBackCallback ) -> REKeyArrayObservable<Entity>
+    public func CreateKeyArrayBack( keys: [Entity.ID] = [], _ fetch: @escaping KeyArrayFetchBackCallback ) -> REKeyArrayObservable<Entity>
     {
         return REKeyArrayObservableCollectionExtra<Entity, REEntityExtraParamsEmpty, CollectionExtra>( holder: self, keys: keys, collectionExtra: collectionExtra, observeOn: queue, fetch: fetch )
     }
     
-    public func CreateKeyArrayBackExtra<Extra>( keys: [REEntityKey] = [], extra: Extra? = nil, _ fetch: @escaping KeyArrayExtraFetchBackCallback<Extra> ) -> REKeyArrayObservableExtra<Entity, Extra>
+    public func CreateKeyArrayBackExtra<Extra>( keys: [Entity.ID] = [], extra: Extra? = nil, _ fetch: @escaping KeyArrayExtraFetchBackCallback<Extra> ) -> REKeyArrayObservableExtra<Entity, Extra>
     {
         return REKeyArrayObservableCollectionExtra<Entity, Extra, CollectionExtra>( holder: self, keys: keys, extra: extra, collectionExtra: collectionExtra, observeOn: queue, fetch: fetch )
     }
     
-    public func CreateKeyArray( keys: [REEntityKey] = [], _ fetch: @escaping KeyArrayFetchCallback ) -> REKeyArrayObservable<Entity>
+    public func CreateKeyArray( keys: [Entity.ID] = [], _ fetch: @escaping KeyArrayFetchCallback ) -> REKeyArrayObservable<Entity>
     {
         return REKeyArrayObservableCollectionExtra<Entity, REEntityExtraParamsEmpty, CollectionExtra>( holder: self, keys: keys, collectionExtra: collectionExtra, observeOn: queue, fetch: fetch )
     }
     
-    public func CreateKeyArrayExtra<Extra>( keys: [REEntityKey] = [], extra: Extra? = nil, _ fetch: @escaping KeyArrayExtraFetchCallback<Extra> ) -> REKeyArrayObservableExtra<Entity, Extra>
+    public func CreateKeyArrayExtra<Extra>( keys: [Entity.ID] = [], extra: Extra? = nil, _ fetch: @escaping KeyArrayExtraFetchCallback<Extra> ) -> REKeyArrayObservableExtra<Entity, Extra>
     {
         return REKeyArrayObservableCollectionExtra<Entity, Extra, CollectionExtra>( holder: self, keys: keys, extra: extra, collectionExtra: collectionExtra, observeOn: queue, fetch: fetch )
     }
@@ -299,7 +299,7 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         preconditionFailure( "To create Array with initial values you must specify arrayFetchCallback or arrayFetchBackCallback before" )
     }
     
-    public func CreateKeyArray( keys: [REEntityKey] ) -> REKeyArrayObservable<Entity>
+    public func CreateKeyArray( keys: [Entity.ID] ) -> REKeyArrayObservable<Entity>
     {
         if arrayFetchCallback != nil
         {
@@ -565,7 +565,7 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         lock.lock()
         defer { lock.unlock() }
         
-        var toUpdate = [REEntityKey: Entity]()
+        var toUpdate = [Entity.ID: Entity]()
         
         sharedEntities.keys.forEach
         {
@@ -599,12 +599,27 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         Commit( entities: [entity], operation: operation )
     }
 
-    public override func Commit( key: REEntityKey, operation: REUpdateOperation )
+    public override func Commit( key: Entity.ID, operation: REUpdateOperation = .update )
     {
         switch operation
         {
         case .delete:
             CommitDelete( keys: Set( arrayLiteral: key ) )
+            
+        case .clear:
+            CommitClear()
+            
+        default:
+            Commit( repositoryKey: REEntityKey( key ), operation: operation )
+        }
+    }
+    
+    private func Commit( repositoryKey key: REEntityKey, operation: REUpdateOperation )
+    {
+        switch operation
+        {
+        case .delete:
+            CommitDelete( keys: EntityKeys( repositoryKeys: Set( arrayLiteral: key ) ) )
             
         case .clear:
             CommitClear()
@@ -634,7 +649,7 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         }
     }
     
-    public override func Commit( key: REEntityKey, changes: (Entity) -> Entity )
+    public override func Commit( key: Entity.ID, changes: (Entity) -> Entity )
     {
         lock.lock()
         defer { lock.unlock() }
@@ -652,7 +667,7 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         switch operation
         {
         case .delete:
-            CommitDelete( keys: Set( entities.map { $0._key } ) )
+            CommitDelete( keys: Set( entities.map { $0.id } ) )
             
         case .clear:
             CommitClear()
@@ -667,11 +682,11 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
                     self.lock.lock()
                     defer { self.lock.unlock() }
                     
-                    var forUpdate = [REEntityKey: Entity]()
+                    var forUpdate = [Entity.ID: Entity]()
                     enities.forEach
                     {
-                        forUpdate[$0._key] = $0
-                        self.sharedEntities[$0._key] = $0
+                        forUpdate[$0.id] = $0
+                        self.sharedEntities[$0.id] = $0
                     }
                     
                     self.items.forEach { $0.ref?.Update( entities: forUpdate, operation: operation ) }
@@ -682,7 +697,7 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
     
     public override func Commit( entities: [Entity], operations: [REUpdateOperation] )
     {
-        let deleteKeys = Set( entities.enumerated().filter { operations[$0.0] == .delete }.map { $0.1._key } )
+        let deleteKeys = Set( entities.enumerated().filter { operations[$0.0] == .delete }.map { $0.1.id } )
         let otherEntities = entities.enumerated().filter { operations[$0.0] != .delete }.map { $0.1 }
         let otherOpers = operations.filter { $0 != .delete }
         
@@ -702,13 +717,13 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
                 self.lock.lock()
                 defer { self.lock.unlock() }
                 
-                var forUpdate = [REEntityKey: Entity]()
-                var operationUpdate = [REEntityKey: REUpdateOperation]()
+                var forUpdate = [Entity.ID: Entity]()
+                var operationUpdate = [Entity.ID: REUpdateOperation]()
                 enities.enumerated().forEach
                 {
-                    forUpdate[$1._key] = $1
-                    operationUpdate[$1._key] = otherOpers[$0]
-                    self.sharedEntities[$1._key] = $1
+                    forUpdate[$1.id] = $1
+                    operationUpdate[$1.id] = otherOpers[$0]
+                    self.sharedEntities[$1.id] = $1
                 }
                 
                 self.items.forEach { $0.ref?.Update( entities: forUpdate, operations: operationUpdate ) }
@@ -716,12 +731,27 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
             .store( in: &cancellables )
     }
     
-    public override func Commit( keys: [REEntityKey], operation: REUpdateOperation = .update )
+    public override func Commit( keys: [Entity.ID], operation: REUpdateOperation = .update )
     {
         switch operation
         {
         case .delete:
             CommitDelete( keys: Set( keys ) )
+            
+        case .clear:
+            CommitClear()
+            
+        default:
+            Commit( repositoryKeys: keys.map { REEntityKey( $0 ) }, operation: operation )
+        }
+    }
+    
+    private func Commit( repositoryKeys keys: [REEntityKey], operation: REUpdateOperation = .update )
+    {
+        switch operation
+        {
+        case .delete:
+            CommitDelete( keys: EntityKeys( repositoryKeys: Set( keys ) ) )
             
         case .clear:
             CommitClear()
@@ -742,7 +772,7 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         }
     }
     
-    public override func Commit( keys: [REEntityKey], operations: [REUpdateOperation] )
+    public override func Commit( keys: [Entity.ID], operations: [REUpdateOperation] )
     {
         let deleteKeys = Set( keys.enumerated().filter { operations[$0.0] == .delete }.map { $0.1 } )
         let otherKeys = keys.enumerated().filter { operations[$0.0] != .delete }.map { $0.1 }
@@ -754,6 +784,26 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         }
         
         CommitDelete( keys: deleteKeys )
+        
+        guard !otherKeys.isEmpty else { return }
+        
+        Commit( repositoryKeys: otherKeys.map { REEntityKey( $0 ) }, operations: otherOpers )
+    }
+    
+    private func Commit( repositoryKeys keys: [REEntityKey], operations: [REUpdateOperation] )
+    {
+        let deleteKeys = Set( keys.enumerated().filter { operations[$0.0] == .delete }.map { $0.1 } )
+        let otherKeys = keys.enumerated().filter { operations[$0.0] != .delete }.map { $0.1 }
+        let otherOpers = operations.filter { $0 != .delete }
+        
+        if let _ = operations.first( where: { $0 == .clear } )
+        {
+            CommitClear()
+        }
+        
+        CommitDelete( keys: EntityKeys( repositoryKeys: deleteKeys ) )
+        
+        guard !otherKeys.isEmpty else { return }
         
         if let r = repository
         {
@@ -769,12 +819,12 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         }
     }
     
-    public override func Commit( keys: [REEntityKey], changes: (Entity) -> Entity )
+    public override func Commit( keys: [Entity.ID], changes: (Entity) -> Entity )
     {
         lock.lock()
         defer { lock.unlock() }
         
-        var forUpdate = [REEntityKey: Entity]()
+        var forUpdate = [Entity.ID: Entity]()
         keys.forEach
         {
             if let e = sharedEntities[$0]
@@ -788,13 +838,21 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         items.forEach { $0.ref?.Update( entities: forUpdate, operation: .update ) }
     }
     
-    override func CommitDelete( keys: Set<REEntityKey> )
+    override func CommitDelete( keys: Set<Entity.ID> )
     {
         lock.lock()
         defer { lock.unlock() }
         
         keys.forEach { sharedEntities.removeValue( forKey: $0 ) }
         items.forEach { $0.ref?.Delete( keys: keys ) }
+    }
+    
+    private func EntityKeys( repositoryKeys: Set<REEntityKey> ) -> Set<Entity.ID>
+    {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        return Set( sharedEntities.values.filter { repositoryKeys.contains( $0.reKey ) }.map { $0.id } )
     }
     
     override func CommitClear()
@@ -807,7 +865,7 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
     }
 
     //MARK: - Updates
-    public func RxRequestForUpdate( source: String = "", key: REEntityKey, update: @escaping (Entity) -> Entity ) -> RESingle<Entity?>
+    public func RxRequestForUpdate( source: String = "", key: Entity.ID, update: @escaping (Entity) -> Entity ) -> RESingle<Entity?>
     {
         return REDeferred
         {
@@ -826,13 +884,13 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         }
     }
     
-    public func RxRequestForUpdate( source: String = "", keys: [REEntityKey], update: @escaping (Entity) -> Entity ) -> RESingle<[Entity]>
+    public func RxRequestForUpdate( source: String = "", keys: [Entity.ID], update: @escaping (Entity) -> Entity ) -> RESingle<[Entity]>
     {
         return REDeferred
         {
             [weak self] promise in
             
-            var updArr = [Entity](), updMap = [REEntityKey: Entity]()
+            var updArr = [Entity](), updMap = [Entity.ID: Entity]()
             keys.forEach
             {
                 if let entity = self?.sharedEntities[$0]
@@ -854,18 +912,18 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
         return RxRequestForUpdate( source: source, keys: sharedEntities.keys.map { $0 }, update: update )
     }
     
-    public func RxRequestForUpdate<EntityS: REEntity>( source: String = "", entities: [REEntityKey: EntityS], underPathes: [KeyPath<Entity, any REEntity>], update: @escaping (Entity, EntityS) -> Entity ) -> RESingle<[Entity]>
+    public func RxRequestForUpdate<EntityS: REEntity>( source: String = "", entities: [EntityS.ID: EntityS], underPathes: [KeyPath<Entity, any REEntity>], update: @escaping (Entity, EntityS) -> Entity ) -> RESingle<[Entity]>
     {
         return REDeferred
         {
             [weak self] promise in
             
-            var updArr = [Entity](), updMap = [REEntityKey: Entity]()
+            var updArr = [Entity](), updMap = [Entity.ID: Entity]()
             let Update: (Entity, EntityS) -> Void = {
                 let new = update( $0, $1 )
-                self?.sharedEntities[$0._key] = new
+                self?.sharedEntities[$0.id] = new
                 updArr.append( new )
-                updMap[$0._key] = new
+                updMap[$0.id] = new
             }
             self?.sharedEntities.forEach
             {
@@ -873,7 +931,7 @@ public class REEntityObservableCollectionExtra<Entity: REEntity, CollectionExtra
                 
                 underPathes.forEach
                 {
-                    if let v = e0.value[keyPath: $0] as? EntityS, let es = entities[v._key]
+                    if let v = e0.value[keyPath: $0] as? EntityS, let es = entities[v.id]
                     {
                         Update( e0.value, es )
                     }

@@ -13,8 +13,6 @@ import Testing
 
 struct TestEntity: REEntity, Equatable
 {
-    var _key: REEntityKey { return REEntityKey( id ) }
-    
     let id: String
     let value: String
     let indirectId: String
@@ -290,7 +288,7 @@ struct REEntityObservableTests
         {
             params in
             
-            BackArray( params.keys.map { TestEntityBack( id: $0.stringKey, value: params.collectionExtra!.test + $0.stringKey ) } )
+            BackArray( params.keys.map { TestEntityBack( id: $0, value: params.collectionExtra!.test + $0 ) } )
         }
         
         let array = collection.CreateKeyArray( initial: [TestEntity( id: "1", value: "3" ), TestEntity( id: "2", value: "4" )] )
@@ -492,7 +490,7 @@ struct REEntityObservableTests
         #expect( fetchCount == 2 )
         
         let keyCollection = REEntityObservableCollectionExtra<TestEntity, ExtraCollectionParams>( queue: DispatchQueue( label: "test.single.key" ), collectionExtra: ExtraCollectionParams( test: "2" ) )
-        keyCollection.singleFetchCallback = { EntitySingle( TestEntity( id: $0.key!.stringKey, value: "2" ) ) }
+        keyCollection.singleFetchCallback = { EntitySingle( TestEntity( id: $0.key!, value: "2" ) ) }
         let keyed = keyCollection.CreateSingle()
         state = try await WaitFor( keyed.rxState ) { $0 == .initializing }
         loader = try await WaitFor( keyed.rxLoader ) { $0 == .none }

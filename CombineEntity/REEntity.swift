@@ -10,26 +10,35 @@ import Foundation
 
 public typealias REEntityKey = AnyHashable
 
-public protocol REEntity: Sendable
+public protocol REEntity: Identifiable, Sendable where ID: Hashable & Sendable
 {
-    ///The key of the element
-    var _key: REEntityKey { get }
     init( entity: any REBackEntityProtocol )
 }
 
 public extension REEntity
 {
+    var reKey: REEntityKey
+    {
+        REEntityKey( id )
+    }
+    
     init( entity: any REBackEntityProtocol )
     {
         preconditionFailure( "Default implimentation is prohibited to call" )
     }
 }
 
-public protocol REBackEntityProtocol: Sendable
+public protocol REBackEntityProtocol: Identifiable, Sendable where ID: Hashable & Sendable
 {
-    ///The key of the element
-    var _key: REEntityKey { get }
     init( entity: any REBackEntityProtocol )
+}
+
+public extension REBackEntityProtocol
+{
+    var reKey: REEntityKey
+    {
+        REEntityKey( id )
+    }
 }
 
 public extension AnyHashable

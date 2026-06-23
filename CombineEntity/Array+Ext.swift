@@ -35,7 +35,7 @@ extension Array where Element: REEntity
 {
     public mutating func AppendOrReplace( entity: Element )
     {
-        if let i = self.firstIndex( where: { entity._key == $0._key } )
+        if let i = self.firstIndex( where: { entity.id == $0.id } )
         {
             self[i] = entity
         }
@@ -47,7 +47,7 @@ extension Array where Element: REEntity
     
     public mutating func AppendNotExist( entity: Element )
     {
-        if let _ = self.firstIndex( where: { entity._key == $0._key } )
+        if let _ = self.firstIndex( where: { entity.id == $0.id } )
         {
             
         }
@@ -62,7 +62,7 @@ extension Array where Element: REEntity
         entities.forEach
         {
             e in
-            if let i = self.firstIndex( where: { e._key == $0._key } )
+            if let i = self.firstIndex( where: { e.id == $0.id } )
             {
                 self[i] = e
             }
@@ -75,31 +75,31 @@ extension Array where Element: REEntity
     
     public mutating func Remove( entity: Element )
     {
-        Remove( key: entity._key )
+        Remove( key: entity.id )
     }
     
-    public mutating func Remove( key: REEntityKey )
+    public mutating func Remove( key: Element.ID )
     {
-        if let i = self.firstIndex( where: { key == $0._key } )
+        if let i = self.firstIndex( where: { key == $0.id } )
         {
             remove( at: i )
         }
     }
     
-    public func asEntitiesMap() -> [REEntityKey: Element]
+    public func asEntitiesMap() -> [Element.ID: Element]
     {
-        var map = [REEntityKey: Element]()
-        forEach { map[$0._key] = $0 }
+        var map = [Element.ID: Element]()
+        forEach { map[$0.id] = $0 }
         return map
     }
     
-    public func Find( key: REEntityKey ) -> Element?
+    public func Find( key: Element.ID ) -> Element?
     {
-        return first( where: { $0._key == key } )
+        return first( where: { $0.id == key } )
     }
 }
 
-extension Array where Element == REEntityKey
+extension Array where Element: Hashable
 {
     public mutating func AppendNotExist( key: Element )
     {

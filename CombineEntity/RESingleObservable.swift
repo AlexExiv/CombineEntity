@@ -40,7 +40,7 @@ public class RESingleObservableExtra<Entity: REEntity, Extra>: REEntityObservabl
     public private(set) var extra: Extra? = nil
     
     /// The key of the current entity
-    public var key: REEntityKey? = nil
+    public var key: Entity.ID? = nil
     
     /// The data of the current entity, nil if data hasn't been loaded yet or not found or record deleted
     public var entity: Entity?
@@ -48,7 +48,7 @@ public class RESingleObservableExtra<Entity: REEntity, Extra>: REEntityObservabl
         return rxPublish.value
     }
     
-    init( holder: REEntityCollection<Entity>, key: REEntityKey? = nil, extra: Extra? = nil, observeOn: DispatchQueue )
+    init( holder: REEntityCollection<Entity>, key: Entity.ID? = nil, extra: Extra? = nil, observeOn: DispatchQueue )
     {
         self.queue = observeOn
         self.key = key
@@ -59,25 +59,25 @@ public class RESingleObservableExtra<Entity: REEntity, Extra>: REEntityObservabl
     
     override func Update( source: String, entity: Entity )
     {
-        if let key = key ?? self.entity?._key, key == entity._key, source != uuid
+        if let key = key ?? self.entity?.id, key == entity.id, source != uuid
         {
             rxPublish.send( entity )
             rxState.send( .ready )
         }
     }
     
-    override func Update( source: String, entities: [REEntityKey: Entity] )
+    override func Update( source: String, entities: [Entity.ID: Entity] )
     {
-        if let key = key ?? entity?._key, let entity = entities[key], source != uuid
+        if let key = key ?? entity?.id, let entity = entities[key], source != uuid
         {
             rxPublish.send( entity )
             rxState.send( .ready )
         }
     }
     
-    override func Update( entities: [REEntityKey: Entity], operation: REUpdateOperation )
+    override func Update( entities: [Entity.ID: Entity], operation: REUpdateOperation )
     {
-        if let k = key ?? entity?._key, let e = entities[k]
+        if let k = key ?? entity?.id, let e = entities[k]
         {
             switch operation
             {
@@ -91,9 +91,9 @@ public class RESingleObservableExtra<Entity: REEntity, Extra>: REEntityObservabl
         }
     }
     
-    override func Update( entities: [REEntityKey: Entity], operations: [REEntityKey: REUpdateOperation] )
+    override func Update( entities: [Entity.ID: Entity], operations: [Entity.ID: REUpdateOperation] )
     {
-        if let k = key ?? entity?._key, let e = entities[k], let o = operations[k]
+        if let k = key ?? entity?.id, let e = entities[k], let o = operations[k]
         {
             switch o
             {
@@ -107,9 +107,9 @@ public class RESingleObservableExtra<Entity: REEntity, Extra>: REEntityObservabl
         }
     }
     
-    override func Delete( keys: Set<REEntityKey> )
+    override func Delete( keys: Set<Entity.ID> )
     {
-        if let k = key ?? entity?._key, keys.contains( k )
+        if let k = key ?? entity?.id, keys.contains( k )
         {
             Clear()
         }
@@ -121,7 +121,7 @@ public class RESingleObservableExtra<Entity: REEntity, Extra>: REEntityObservabl
         rxState.send( .deleted )
     }
     
-    func Set( key: REEntityKey )
+    func Set( key: Entity.ID )
     {
         self.key = key
     }

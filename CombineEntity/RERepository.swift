@@ -31,7 +31,7 @@ public struct REEntityUpdated: CustomStringConvertible
     
     public init( entity: any REBackEntityProtocol, fieldPath: AnyKeyPath? = nil, operation: REUpdateOperation = .none )
     {
-        self.init( key: entity._key, fieldPath: fieldPath, entity: entity, operation: operation )
+        self.init( key: entity.reKey, fieldPath: fieldPath, entity: entity, operation: operation )
     }
     
     public var description: String

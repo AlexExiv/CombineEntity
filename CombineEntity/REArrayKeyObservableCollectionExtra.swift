@@ -9,7 +9,7 @@
 import Foundation
 import Combine
 
-public struct REKeyParams<Extra, CollectionExtra>
+public struct REKeyParams<Key: Hashable & Sendable, Extra, CollectionExtra>
 {
     /// Update requested from refreshing
     public let refreshing: Bool
@@ -17,13 +17,13 @@ public struct REKeyParams<Extra, CollectionExtra>
     /// The first loading request flag
     public let first: Bool
     /// The keys of requested elements
-    public let keys: [REEntityKey]
+    public let keys: [Key]
     /// The observable's extra params for example filter and e.g.
     public let extra: Extra?
     /// The collection extra params it maybe a region or city or so on
     public let collectionExtra: CollectionExtra?
     
-    init( refreshing: Bool = false, resetCache: Bool = false, first: Bool = false, keys: [REEntityKey], extra: Extra? = nil, collectionExtra: CollectionExtra? = nil )
+    init( refreshing: Bool = false, resetCache: Bool = false, first: Bool = false, keys: [Key], extra: Extra? = nil, collectionExtra: CollectionExtra? = nil )
     {
         self.refreshing = refreshing
         self.resetCache = resetCache
@@ -36,34 +36,34 @@ public struct REKeyParams<Extra, CollectionExtra>
 
 public class REKeyArrayObservableCollectionExtra<Entity: REEntity, Extra, CollectionExtra>: REKeyArrayObservableExtra<Entity, Extra>
 {
-    public typealias ArrayFetchCallback<KeyExtra, KeyCollectionExtra> = (REKeyParams<KeyExtra, KeyCollectionExtra>) -> RESingle<[Entity]>
-    public typealias ArrayFetchBackCallback<KeyExtra, KeyCollectionExtra> = (REKeyParams<KeyExtra, KeyCollectionExtra>) -> RESingle<[any REBackEntityProtocol]>
+    public typealias ArrayFetchCallback<KeyExtra, KeyCollectionExtra> = (REKeyParams<Entity.ID, KeyExtra, KeyCollectionExtra>) -> RESingle<[Entity]>
+    public typealias ArrayFetchBackCallback<KeyExtra, KeyCollectionExtra> = (REKeyParams<Entity.ID, KeyExtra, KeyCollectionExtra>) -> RESingle<[any REBackEntityProtocol]>
     
-    public override var _keys: [REEntityKey]
+    override var innerKeys: [Entity.ID]
     {
         set
         {
             lock.lock()
             defer { lock.unlock() }
             
-            super._keys = newValue
+            super.innerKeys = newValue
             Request( REKeyParams( keys: keys, extra: extra, collectionExtra: collectionExtra ) )
         }
         get
         {
-            super._keys
+            super.innerKeys
         }
     }
     
-    let rxKeys = PassthroughSubject<REKeyParams<Extra, CollectionExtra>, Never>()
+    let rxKeys = PassthroughSubject<REKeyParams<Entity.ID, Extra, CollectionExtra>, Never>()
 
     public private(set) var collectionExtra: CollectionExtra? = nil
     
     private let fetchCallback: ArrayFetchCallback<Extra, CollectionExtra>
     private var refreshCancellable: AnyCancellable? = nil
-    private var pendingParams: REKeyParams<Extra, CollectionExtra>? = nil
+    private var pendingParams: REKeyParams<Entity.ID, Extra, CollectionExtra>? = nil
       
-    init( holder: REEntityCollection<Entity>, keys: [REEntityKey] = [], start: Bool = true, extra: Extra? = nil, collectionExtra: CollectionExtra? = nil, observeOn: DispatchQueue, fetch: @escaping ArrayFetchCallback<Extra, CollectionExtra> )
+    init( holder: REEntityCollection<Entity>, keys: [Entity.ID] = [], start: Bool = true, extra: Extra? = nil, collectionExtra: CollectionExtra? = nil, observeOn: DispatchQueue, fetch: @escaping ArrayFetchCallback<Extra, CollectionExtra> )
     {
         self.collectionExtra = collectionExtra
         self.fetchCallback = fetch
@@ -77,7 +77,7 @@ public class REKeyArrayObservableCollectionExtra<Entity: REEntity, Extra, Collec
     
     convenience init( holder: REEntityCollection<Entity>, initial: [Entity], collectionExtra: CollectionExtra? = nil, observeOn: DispatchQueue, fetch: @escaping ArrayFetchCallback<Extra, CollectionExtra> )
     {
-        self.init( holder: holder, keys: initial.map { $0._key }, start: false, collectionExtra: collectionExtra, observeOn: observeOn, fetch: fetch )
+        self.init( holder: holder, keys: initial.map { $0.id }, start: false, collectionExtra: collectionExtra, observeOn: observeOn, fetch: fetch )
         
         collection?.RxRequestForCombine( source: uuid, entities: initial )
             .receive( on: observeOn )
@@ -90,7 +90,7 @@ public class REKeyArrayObservableCollectionExtra<Entity: REEntity, Extra, Collec
             .store( in: &cancellables )
     }
     
-    convenience init( holder: REEntityCollection<Entity>, keys: [REEntityKey] = [], extra: Extra? = nil, collectionExtra: CollectionExtra? = nil, observeOn: DispatchQueue, fetch: @escaping ArrayFetchBackCallback<Extra, CollectionExtra> )
+    convenience init( holder: REEntityCollection<Entity>, keys: [Entity.ID] = [], extra: Extra? = nil, collectionExtra: CollectionExtra? = nil, observeOn: DispatchQueue, fetch: @escaping ArrayFetchBackCallback<Extra, CollectionExtra> )
     {
         self.init( holder: holder, keys: keys, extra: extra, collectionExtra: collectionExtra, observeOn: observeOn, fetch: { fetch( $0 ).map { $0.map { Entity( entity: $0 ) } }.eraseToAnyPublisher() } )
     }
@@ -100,7 +100,7 @@ public class REKeyArrayObservableCollectionExtra<Entity: REEntity, Extra, Collec
         self.init( holder: holder, initial: initial, collectionExtra: collectionExtra, observeOn: observeOn, fetch: { fetch( $0 ).map { $0.map { Entity( entity: $0 ) } }.eraseToAnyPublisher() } )
     }
 
-    private func Request( _ params: REKeyParams<Extra, CollectionExtra> )
+    private func Request( _ params: REKeyParams<Entity.ID, Extra, CollectionExtra> )
     {
         rxKeys.send( params )
         pendingParams = params
@@ -184,14 +184,14 @@ public class REKeyArrayObservableCollectionExtra<Entity: REEntity, Extra, Collec
     }
     
     //MARK: - Fetch
-    private func RxFetchElements( params: REKeyParams<Extra, CollectionExtra>, fetch: @escaping ArrayFetchCallback<Extra, CollectionExtra> ) -> RESingle<[Entity]>
+    private func RxFetchElements( params: REKeyParams<Entity.ID, Extra, CollectionExtra>, fetch: @escaping ArrayFetchCallback<Extra, CollectionExtra> ) -> RESingle<[Entity]>
     {
         if params.refreshing
         {
             return fetch( params )
         }
         
-        let exist = params.keys.compactMap { k in collection?.sharedEntities[k] ?? entities.first( where: { k == $0._key } ) }
+        let exist = params.keys.compactMap { k in collection?.sharedEntities[k] ?? entities.first( where: { k == $0.id } ) }
         if exist.count != params.keys.count
         {
             let existMap = exist.asEntitiesMap()
