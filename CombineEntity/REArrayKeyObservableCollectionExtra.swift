@@ -59,15 +59,70 @@ public class REKeyArrayObservableCollectionExtra<Entity: REEntity, Extra, Collec
 
     public private(set) var collectionExtra: CollectionExtra? = nil
     
-    private let fetchCallback: ArrayFetchCallback<Extra, CollectionExtra>
-    private var refreshCancellable: AnyCancellable? = nil
-    private var pendingParams: REKeyParams<Entity.ID, Extra, CollectionExtra>? = nil
-      
     init( holder: REEntityCollection<Entity>, keys: [Entity.ID] = [], start: Bool = true, extra: Extra? = nil, collectionExtra: CollectionExtra? = nil, observeOn: DispatchQueue, fetch: @escaping ArrayFetchCallback<Extra, CollectionExtra> )
     {
         self.collectionExtra = collectionExtra
-        self.fetchCallback = fetch
         super.init( holder: holder, keys: keys, extra: extra, observeOn: observeOn )
+        
+        rxKeys
+            .combineLatest( rxSuspended )
+            .filter { $0.0.keys.count > 0 && !$0.1 }
+            .map { $0.0 }
+            .handleEvents( receiveOutput:
+            {
+                [weak self] params in
+                
+                self?.rxLoader.send( params.first ? .firstLoading : .loading )
+                self?.rxLastError.send( nil )
+            } )
+            .receive( on: queue )
+            .map
+            {
+                [weak self] params -> AnyPublisher<[Entity], Never> in
+                
+                guard let self else { return Just( [] ).eraseToAnyPublisher() }
+                
+                return self.RxFetchElements( params: params, fetch: fetch )
+                    .catch
+                    {
+                        [weak self] error -> RESingle<[Entity]> in
+                        
+                        self?.rxError.send( error )
+                        self?.rxLastError.send( error )
+                        self?.rxLoader.send( .none )
+                        return REJust( [] )
+                    }
+                    .flatMap
+                    {
+                        [weak self] in
+                        
+                        self?.collection?.RxRequestForCombine( source: self?.uuid ?? "", entities: $0 ) ?? REJust( [] )
+                    }
+                    .replaceError( with: [] )
+                    .eraseToAnyPublisher()
+            }
+            .switchToLatest()
+            .receive( on: observeOn )
+            .sink
+            {
+                [weak self] in
+                
+                self?.rxLoader.send( .none )
+                self?.Set( entities: $0 )
+            }
+            .store( in: &cancellables )
+        
+        rxKeys
+            .filter { $0.keys.count == 0 }
+            .receive( on: observeOn )
+            .sink
+            {
+                [weak self] _ in
+                
+                self?.rxLoader.send( .none )
+                self?.Set( entities: [] )
+            }
+            .store( in: &cancellables )
         
         if start
         {
@@ -103,53 +158,6 @@ public class REKeyArrayObservableCollectionExtra<Entity: REEntity, Extra, Collec
     private func Request( _ params: REKeyParams<Entity.ID, Extra, CollectionExtra> )
     {
         rxKeys.send( params )
-        pendingParams = params
-        
-        guard rxSuspended.value == false else { return }
-        
-        if params.keys.isEmpty
-        {
-            rxLoader.send( .none )
-            Set( entities: [] )
-            return
-        }
-        
-        rxLoader.send( params.first ? .firstLoading : .loading )
-        rxLastError.send( nil )
-        
-        refreshCancellable?.cancel()
-        refreshCancellable = RxFetchElements( params: params, fetch: fetchCallback )
-            .catch
-            {
-                [weak self] error -> RESingle<[Entity]> in
-                
-                self?.rxError.send( error )
-                self?.rxLastError.send( error )
-                self?.rxLoader.send( .none )
-                return REJust( [] )
-            }
-            .flatMap
-            {
-                [weak self] in
-                
-                self?.collection?.RxRequestForCombine( source: self?.uuid ?? "", entities: $0 ) ?? REJust( [] )
-            }
-            .receive( on: queue )
-            .sink( receiveCompletion: { _ in }, receiveValue:
-            {
-                [weak self] in
-                
-                self?.rxLoader.send( .none )
-                self?.Set( entities: $0 )
-            } )
-    }
-    
-    override func ResumeData()
-    {
-        if let pendingParams
-        {
-            Request( pendingParams )
-        }
     }
     
     public override func Refresh( resetCache: Bool = false, extra: Extra? = nil )

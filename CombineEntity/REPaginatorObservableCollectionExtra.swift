@@ -49,15 +49,57 @@ public class REPaginatorObservableCollectionExtra<Entity: REEntity, Extra, Colle
     public private(set) var collectionExtra: CollectionExtra? = nil
     var started = false
     
-    private let fetchCallback: PageFetchCallback<Extra, CollectionExtra>
-    private var refreshCancellable: AnyCancellable? = nil
-    private var pendingParams: REPageParams<Extra, CollectionExtra>? = nil
-      
     init( holder: REEntityCollection<Entity>, extra: Extra? = nil, collectionExtra: CollectionExtra? = nil, perPage: Int = RE_ARRAY_PER_PAGE, start: Bool = true, observeOn: DispatchQueue, fetch: @escaping PageFetchCallback<Extra, CollectionExtra> )
     {
         self.collectionExtra = collectionExtra
-        self.fetchCallback = fetch
         super.init( holder: holder, extra: extra, perPage: perPage, observeOn: observeOn )
+        
+        rxPage
+            .combineLatest( rxSuspended )
+            .filter { $0.0.page >= 0 && !$0.1 }
+            .map { $0.0 }
+            .handleEvents( receiveOutput:
+            {
+                [weak self] params in
+                
+                self?.rxLoader.send( params.first ? .firstLoading : .loading )
+                self?.rxLastError.send( nil )
+            } )
+            .map
+            {
+                [weak self] params -> AnyPublisher<[Entity], Never> in
+                
+                guard let self else { return Just( [] ).eraseToAnyPublisher() }
+                
+                return fetch( params )
+                    .catch
+                    {
+                        [weak self] error -> RESingle<[Entity]> in
+                        
+                        self?.rxError.send( error )
+                        self?.rxLastError.send( error )
+                        self?.rxLoader.send( .none )
+                        return REJust( [] )
+                    }
+                    .flatMap
+                    {
+                        [weak self] in
+                        
+                        self?.collection?.RxRequestForCombine( source: self?.uuid ?? "", entities: $0 ) ?? REJust( [] )
+                    }
+                    .replaceError( with: [] )
+                    .eraseToAnyPublisher()
+            }
+            .switchToLatest()
+            .receive( on: observeOn )
+            .sink
+            {
+                [weak self] in
+                
+                self?.rxLoader.send( .none )
+                self?.Set( entities: self?.Append( entities: $0 ) ?? [] )
+            }
+            .store( in: &cancellables )
         
         if start
         {
@@ -96,47 +138,6 @@ public class REPaginatorObservableCollectionExtra<Entity: REEntity, Extra, Colle
     private func Request( _ params: REPageParams<Extra, CollectionExtra> )
     {
         rxPage.send( params )
-        pendingParams = params
-        
-        guard params.page >= 0 else { return }
-        guard rxSuspended.value == false else { return }
-        
-        rxLoader.send( params.first ? .firstLoading : .loading )
-        rxLastError.send( nil )
-        
-        refreshCancellable?.cancel()
-        refreshCancellable = fetchCallback( params )
-            .catch
-            {
-                [weak self] error -> RESingle<[Entity]> in
-                
-                self?.rxError.send( error )
-                self?.rxLastError.send( error )
-                self?.rxLoader.send( .none )
-                return REJust( [] )
-            }
-            .flatMap
-            {
-                [weak self] in
-                
-                self?.collection?.RxRequestForCombine( source: self?.uuid ?? "", entities: $0 ) ?? REJust( [] )
-            }
-            .receive( on: queue )
-            .sink( receiveCompletion: { _ in }, receiveValue:
-            {
-                [weak self] in
-                
-                self?.rxLoader.send( .none )
-                self?.Set( entities: self?.Append( entities: $0 ) ?? [] )
-            } )
-    }
-    
-    override func ResumeData()
-    {
-        if let pendingParams
-        {
-            Request( pendingParams )
-        }
     }
     
     public override func Refresh( resetCache: Bool = false, extra: Extra? = nil )

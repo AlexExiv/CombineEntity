@@ -50,10 +50,6 @@ public class RESingleObservableCollectionExtra<Entity: REEntity, Extra, Collecti
     public private(set) var collectionExtra: CollectionExtra? = nil
     var started = false
     
-    private let fetchCallback: SingleFetchCallback
-    private var refreshCancellable: AnyCancellable? = nil
-    private var pendingParams: RESingleParams<Entity, Extra, CollectionExtra>? = nil
-    
     public override var key: Entity.ID?
     {
         set
@@ -76,9 +72,64 @@ public class RESingleObservableCollectionExtra<Entity: REEntity, Extra, Collecti
     init( holder: REEntityCollection<Entity>, key: Entity.ID? = nil, extra: Extra? = nil, collectionExtra: CollectionExtra? = nil, start: Bool = true, observeOn: DispatchQueue, fetch: @escaping SingleFetchCallback )
     {
         self.collectionExtra = collectionExtra
-        self.fetchCallback = fetch
         
         super.init( holder: holder, key: key, extra: extra, observeOn: observeOn )
+        
+        _rxRefresh
+            .combineLatest( rxSuspended )
+            .filter { $0.0 != nil && !$0.1 }
+            .map { $0.0! }
+            .handleEvents( receiveOutput:
+            {
+                [weak self] params in
+                
+                self?.rxLoader.send( params.first ? .firstLoading : .loading )
+                if params.first
+                {
+                    self?.rxState.send( .initializing )
+                }
+                self?.rxLastError.send( nil )
+            } )
+            .map
+            {
+                [weak self] params -> AnyPublisher<Entity?, Never> in
+                
+                guard let self else { return Just( nil ).eraseToAnyPublisher() }
+                
+                return fetch( params )
+                    .flatMap
+                    {
+                        entity -> RESingle<Entity?> in
+                        
+                        guard let entity else
+                        {
+                            return REFail( NSError( domain: "", code: 404, userInfo: nil ) )
+                        }
+                        
+                        return self.collection?.RxRequestForCombine( source: self.uuid, entity: entity ).map { Optional( $0 ) }.eraseToAnyPublisher() ?? REJust( nil )
+                    }
+                    .catch
+                    {
+                        [weak self] error -> AnyPublisher<Entity?, Never> in
+                        
+                        self?.rxError.send( error )
+                        self?.rxLastError.send( error )
+                        self?.rxLoader.send( .none )
+                        return Just( nil ).eraseToAnyPublisher()
+                    }
+                    .eraseToAnyPublisher()
+            }
+            .switchToLatest()
+            .receive( on: observeOn )
+            .sink
+            {
+                [weak self] in
+                
+                self?.rxPublish.send( $0 )
+                self?.rxLoader.send( .none )
+                self?.rxState.send( $0 == nil ? .notFound : .ready )
+            }
+            .store( in: &cancellables )
         
         if start
         {
@@ -118,60 +169,6 @@ public class RESingleObservableCollectionExtra<Entity: REEntity, Extra, Collecti
     private func Request( _ params: RESingleParams<Entity, Extra, CollectionExtra> )
     {
         _rxRefresh.send( params )
-        pendingParams = params
-        
-        guard rxSuspended.value == false else { return }
-        
-        rxLoader.send( params.first ? .firstLoading : .loading )
-        if params.first
-        {
-            rxState.send( .initializing )
-        }
-        rxLastError.send( nil )
-        
-        refreshCancellable?.cancel()
-        refreshCancellable = fetchCallback( params )
-            .flatMap
-            {
-                [weak self] entity -> RESingle<Entity?> in
-                
-                guard let self else { return REJust( nil ) }
-                guard let entity else
-                {
-                    return REFail( NSError( domain: "", code: 404, userInfo: nil ) )
-                }
-                
-                return self.collection?.RxRequestForCombine( source: self.uuid, entity: entity ).map { Optional( $0 ) }.eraseToAnyPublisher() ?? REJust( nil )
-            }
-            .receive( on: queue )
-            .sink( receiveCompletion:
-            {
-                [weak self] in
-                
-                if case let .failure( error ) = $0
-                {
-                    self?.rxError.send( error )
-                    self?.rxLastError.send( error )
-                    self?.rxLoader.send( .none )
-                    self?.rxPublish.send( nil )
-                    self?.rxState.send( .notFound )
-                }
-            }, receiveValue:
-            {
-                [weak self] in
-                
-                self?.rxPublish.send( $0 )
-                self?.rxLoader.send( .none )
-                self?.rxState.send( $0 == nil ? .notFound : .ready )
-            } )
-    }
-    
-    override func ResumeData()
-    {
-        if let pendingParams
-        {
-            Request( pendingParams )
-        }
     }
     
     override func _Refresh( resetCache: Bool = false, extra: Extra? = nil )
